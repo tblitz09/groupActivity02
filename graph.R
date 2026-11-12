@@ -27,6 +27,14 @@ rpart.rules(fit, cover = TRUE)
 fit$variable.importance
 
 # Step 4: predict for new cases (column names must match your data)
+new_cases <- tibble(
+  body_temp = c(32, 38),
+  reaction_ms = c(650, 250),
+  groan_db = c(80, 30),
+  bite_marks = c(2, 0),
+  has_umbrella = factor(c("yes", "no"),
+                        levels = levels(mydata$has_umbrella))
+)
 predict(fit, newdata = new_cases, type = "class")  # category
 predict(fit, newdata = new_cases, type = "prob")   # probabilities
 
