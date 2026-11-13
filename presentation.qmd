@@ -1,0 +1,224 @@
+---
+title: "The Zombie Checkpoint"
+subtitle: "Group 2 · Decision trees and unequal mistake costs"
+format:
+  revealjs:
+    theme: white
+    slide-number: true
+    transition: none
+    center: false
+    width: 1280
+    height: 720
+    margin: 0.08
+    embed-resources: true
+    html-math-method: plain
+    controls: true
+    progress: true
+    footer: "Group 2 · Zombie checkpoint"
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+source('analysis.R')
+```
+
+<style>
+.reveal { font-family: 'Aptos', 'Arial', sans-serif; font-size: 30px; color: #253747; }
+.reveal h1, .reveal h2, .reveal h3 { color: #163c55; font-weight: 600; text-transform: none; }
+.reveal h1 { font-size: 2.05em; }
+.reveal h2 { font-size: 1.48em; margin-bottom: 0.6em; }
+.reveal h3 { font-size: 1.05em; }
+.reveal p, .reveal li { line-height: 1.4; }
+.reveal li { margin-bottom: .4em; }
+.reveal table { font-size: .83em; margin: .6em 0; width: 100%; }
+.reveal table th { color: #163c55; border-bottom: 2px solid #163c55; }
+.reveal table td { border-bottom: 1px solid #d8e0e6; }
+.reveal strong { color: #163c55; }
+.reveal .small { font-size: .70em; color: #526575; }
+.reveal .takeaway { border-left: 4px solid #3b7794; padding-left: .65em; margin-top: .85em; }
+.reveal .slide-number { color: #526575; }
+#title-slide { text-align: left; }
+#title-slide h1 { margin-top: 1.5em; }
+#title-slide .subtitle { font-size: .85em; color: #526575; }
+</style>
+
+## The data and the baseline
+
+**90 checkpoint records: 69 humans and 21 zombies**
+
+- Predictors: body temperature, reaction time, groan volume, bite marks, and umbrella possession.
+- Outcome: human or zombie.
+- Default `rpart` classification tree, following the supplied R script.
+
+::: {.takeaway}
+Letting everyone in achieves **76.7% accuracy** while missing **all 21 zombies**.
+:::
+
+::: {.notes}
+Source: data/group2_zombie_checkpoint.csv and the supplied graph.R. The outcome is retrospective status. No additional predictors or tuned control settings were introduced. The full-data comparisons use all 90 fitting records. A separate slide reports held-out performance.
+:::
+
+## Body temperature drives the default tree
+
+:::: {.columns}
+::: {.column width="54%"}
+```{r}
+#| fig-width: 7
+#| fig-height: 4.4
+plot_tree(fit)
+```
+:::
+::: {.column width="46%"}
+**Gate rules**
+
+- Below **36.35°C**: quarantine.
+- At or above **36.35°C**: admit.
+
+Body temperature has the highest variable importance. Other signs do not enter this final tree.
+:::
+::::
+
+::: {.small}
+Tree fitted to all 90 records. “Zombie” means quarantine, “human” means admit.
+:::
+
+::: {.notes}
+The split is the midpoint between observed temperatures of 36.3 and 36.4 degrees Celsius. rpart importance includes surrogate splits, so nonzero importance for another feature does not imply that feature appears in the displayed tree. Umbrella possession has no importance in this fit.
+:::
+
+## The default tree misses two zombies
+
+| Actual class | Admit: predicted human | Quarantine: predicted zombie |
+|---|---:|---:|
+| Human | 66 | **3** |
+| Zombie | **2** | 19 |
+
+**94.4% accuracy** · **90.5% zombie recall**
+
+Both missed zombies have a temperature of **36.7°C**. Their bite marks do not affect the default rule.
+
+::: {.small}
+All 90 fitting records. Bold cells show mistakes. Recall = zombies caught / all zombies.
+:::
+
+::: {.notes}
+Missed zombies are data rows 6 and 84, excluding the CSV header. Their bite-mark counts are 2 and 1. These are fitting-record results and should not be presented as generalization estimates.
+:::
+
+## A 10× penalty adds a bite-mark check
+
+:::: {.columns}
+::: {.column width="48%"}
+### Equal mistake costs
+```{r}
+#| fig-width: 6.3
+#| fig-height: 3.4
+plot_tree(fit)
+```
+:::
+::: {.column width="52%"}
+### Missing a zombie costs 10×
+```{r}
+#| fig-width: 7
+#| fig-height: 3.4
+plot_tree(fit_costly)
+```
+:::
+::::
+
+::: {.takeaway}
+With the 10× loss, admit only people at or above **36.35°C** who have **zero bite marks**.
+:::
+
+::: {.small}
+Both trees fit all 90 records. A bite-mark split at 0.5 separates zero from one or more.
+:::
+
+::: {.notes}
+Loss matrix has actual classes as rows and predicted classes as columns, in the order human, zombie. Matrix rows are [0, 1] and [10, 0]. This matches the supplied matrix(c(0, 10, 1, 0), nrow = 2), which R fills by columns. Correct classifications cost zero.
+:::
+
+## Fewer missed zombies, more humans in quarantine
+
+:::: {.columns}
+::: {.column width="48%"}
+### Equal costs
+
+| Actual | Admit | Quarantine |
+|---|---:|---:|
+| Human | 66 | **3** |
+| Zombie | **2** | 19 |
+:::
+::: {.column width="48%"}
+### 10× loss
+
+| Actual | Admit | Quarantine |
+|---|---:|---:|
+| Human | 54 | **15** |
+| Zombie | **0** | 21 |
+:::
+::::
+
+| Measure | Equal costs | 10× loss |
+|---|---:|---:|
+| Accuracy | 94.4% | 83.3% |
+| Zombie recall | 90.5% | 100% |
+| Cost: 10 × missed zombies + quarantined humans | 23 | 15 |
+
+::: {.small}
+All 90 fitting records. The cost falls by 8 units under the assumed 10:1 ratio.
+:::
+
+## The held-out test shows no improvement
+
+Both models train on the **same 68 people** and predict the **same 22 unseen records**.
+
+| Actual class | Admit: both trees | Quarantine: both trees |
+|---|---:|---:|
+| Human | 18 | 0 |
+| Zombie | **2** | 2 |
+
+**90.9% accuracy** · **50% zombie recall** · **Cost 20**
+
+Both trees retain only the temperature rule. The training set contains no zombies at or above 36.35°C.
+
+::: {.small}
+Seed 301 and 75% sampling, as in graph.R. Only four zombies appear in the test set.
+:::
+
+::: {.notes}
+The original supplied script fits the costly tree to all records, whereas its test tree uses only training rows. Comparing those as though both were held-out evaluations would leak test information. Here both held-out models use training rows only. Full-data tree performance and test-set performance answer different questions. This single small split cannot establish that the cost model will improve generalization.
+:::
+
+## The hardest cases look human
+
+- Both missed zombies have normal-looking temperatures and reaction times that overlap human values.
+- Bite marks help catch them in the full-data model, but the same rule also quarantines more humans.
+- Early infection could explain subtle symptoms. The dataset cannot confirm that explanation.
+
+::: {.takeaway}
+Accuracy hides which mistakes the model makes. The cost ratio determines which tradeoff we prefer.
+:::
+
+::: {.notes}
+The two missed zombies have temperatures 36.7 and 36.7°C, reaction times 304 and 297 ms, groans 47 and 42 dB, and bite counts 2 and 1. Human records overlap their temperature, reaction time and groan ranges.
+:::
+
+## Gate policy and real-world parallels
+
+**Provisional choice:** the full-data 10× tree, if the town accepts the 10:1 cost ratio. Its fitting-record cost is lower, but the held-out test does not establish a benefit.
+
+- Wrong quarantine still harms humans. Prompt review and retesting matter.
+- Disease screening balances missed illness against unnecessary follow-up.
+- Fraud detection balances missed fraud against blocked legitimate payments.
+
+::: {.takeaway}
+Before deployment, evaluate more representative cases and report both kinds of mistake alongside recall and cost.
+:::
+
+::: {.notes}
+The cost ratio is a scenario assumption and a policy choice, not an estimated consequence. Stakeholders, especially wrongly quarantined people, may disagree with it. Real-world examples illustrate error-cost differences and are not medical or financial recommendations. All numerical results derive from the supplied CSV and reproducible analysis.R.
+:::
